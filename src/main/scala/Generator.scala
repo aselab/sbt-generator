@@ -7,7 +7,13 @@ import sbt.complete.Parser
 import sbt.complete.DefaultParsers._
 import scala.util.DynamicVariable
 
-class GeneratorContext(state: State, streamLogger: Logger) {
+object Mode extends Enumeration {
+  val Invoke, Revoke = Value
+}
+
+class GeneratorContext(
+  state: State, streamLogger: Logger
+) {
   val extracted: Extracted = Project.extract(state)
   def apply[T](key: SettingKey[T]): T = extracted.get(key)
   def apply[T](key: TaskKey[T]): T = extracted.runTask(key, state)._2
@@ -19,15 +25,29 @@ class GeneratorContext(state: State, streamLogger: Logger) {
   lazy val scalateTemplate = new ScalateTemplate(scalaJar, templateDir)
 }
 
-trait Generator[ArgumentsType] extends FileActions with TemplateActions {
+trait Generator[ArgumentsType] extends RevokableActions {
   def name: String
   def help: String
   def argumentsParser: Parser[ArgumentsType]
+
+  private var _mode: Mode.Value = _
+  def mode = _mode
   protected def generate(args: ArgumentsType): Unit
+  protected def destroy(args: ArgumentsType): Unit = {
+    val functions = recordInvocations { generate(args) }
+    functions.reverse.foreach(_.apply)
+  }
 
   def invoke(args: ArgumentsType)(implicit context: GeneratorContext) =
     _context.withValue(context) {
+      _mode = Mode.Invoke
       generate(args.asInstanceOf[ArgumentsType])
+    }
+
+  def revoke(args: ArgumentsType)(implicit context: GeneratorContext) =
+    _context.withValue(context) {
+      _mode = Mode.Revoke
+      destroy(args.asInstanceOf[ArgumentsType])
     }
 
   def register = Generator.register(this)

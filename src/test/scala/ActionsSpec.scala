@@ -9,12 +9,11 @@ import Status._
 object ActionsSpec extends Specification with BeforeAfterExample with Mockito {
   sequential
 
-  class Tester extends FileActions with TemplateActions {
+  class Tester(var mode: Mode.Value = Mode.Invoke) extends RevokableActions {
     val logger = mock[GeneratorLogger]
     val scalateTemplate = mock[ScalateTemplate]
   }
 
-  val actions = new Tester
   var workDir: File = _
   lazy val copyDir = file(getClass.getResource("/root").getPath)
 
@@ -33,6 +32,7 @@ object ActionsSpec extends Specification with BeforeAfterExample with Mockito {
   }
 
   "FileActions" should {
+    val actions = new Tester
     "createDirectory" in {
       val dir = workDir / "test"
       actions.createDirectory(dir) mustEqual Create
@@ -41,6 +41,17 @@ object ActionsSpec extends Specification with BeforeAfterExample with Mockito {
 
       actions.createDirectory(dir) mustEqual Exist
       there was one(actions.logger).log(Exist, dir)
+    }
+
+    "removeDirectory" in {
+      val dir = workDir / "test"
+      IO.createDirectory(dir)
+      actions.removeDirectory(dir) mustEqual Remove
+      there was one(actions.logger).log(Remove, dir)
+      dir.exists must beFalse
+
+      actions.removeDirectory(dir) mustEqual Skip
+      there was one(actions.logger).log(Skip, dir)
     }
 
     "copyDirectory" in {
@@ -70,6 +81,17 @@ object ActionsSpec extends Specification with BeforeAfterExample with Mockito {
       actions.createFile(file, content) mustEqual Identical
       there was one(actions.logger).log(Identical, file)
       IO.read(file) mustEqual content
+    }
+
+    "removeFile" in {
+      val file = workDir / "testFile"
+      IO.touch(file)
+      actions.removeFile(file) mustEqual Remove
+      there was one(actions.logger).log(Remove, file)
+      file.exists must beFalse
+
+      actions.removeFile(file) mustEqual Skip
+      there was one(actions.logger).log(Skip, file)
     }
 
     "copyFile" in {
@@ -221,6 +243,7 @@ object ActionsSpec extends Specification with BeforeAfterExample with Mockito {
   }
 
   "TemplateActions" should {
+    val actions = new Tester
     "template" in {
       val dst = workDir / "test.txt"
       val src = "test.txt.ssp"
@@ -229,6 +252,134 @@ object ActionsSpec extends Specification with BeforeAfterExample with Mockito {
       IO.read(dst) mustEqual "Hello John"
 
       actions.template(dst, src, "name" -> "John") mustEqual Identical
+    }
+  }
+
+  "RevokableActions" should {
+    val actions = new Tester(Mode.Revoke)
+
+    "createDirectory" in {
+      val dir = workDir / "test"
+      IO.createDirectory(dir)
+      actions.createDirectory(dir) mustEqual Remove
+      there was one(actions.logger).log(Remove, dir)
+      dir.exists must beFalse
+
+      actions.createDirectory(dir) mustEqual Skip
+      there was one(actions.logger).log(Skip, dir)
+    }
+
+    "copyDirectory" in {
+      val files = Seq(
+        workDir / "dir1",
+        workDir / "dir1/dir2",
+        workDir / "dir1/dir2/dir3",
+        workDir / "dir1/dir2/file1",
+        workDir / "dir1/file2",
+        workDir / "dir4",
+        workDir / "dir4/file3"
+      )
+      val additionalFile = workDir / "dir1/file4"
+      IO.copyDirectory(copyDir, workDir)
+      IO.touch(additionalFile)
+
+      actions.copyDirectory(copyDir, workDir) must containTheSameElementsAs(files)
+
+      files.tail must contain((f: File) => !f.exists).foreach
+      files.head.exists must beTrue
+      additionalFile.exists must beTrue
+    }
+
+    "createFile" in {
+      val file = workDir / "testFile"
+      IO.touch(file)
+      actions.createFile(file, "") mustEqual Remove
+      there was one(actions.logger).log(Remove, file)
+      file.exists must beFalse
+
+      actions.createFile(file, "") mustEqual Skip
+      there was one(actions.logger).log(Skip, file)
+    }
+
+    "copyFile" in {
+      val src = copyDir / "dir4/file3"
+      val dst = workDir / "dir4/file3"
+      IO.copyFile(src, dst)
+      actions.copyFile(src, dst) mustEqual Remove
+      there was one(actions.logger).log(Remove, dst)
+      dst.exists must beFalse
+
+      actions.copyFile(src, dst) mustEqual Skip
+      there was one(actions.logger).log(Skip, dst)
+    }
+
+    "template" in {
+      val dst = workDir / "test.txt"
+      val src = "test.txt.ssp"
+      IO.touch(dst)
+      actions.template(dst, src, "name" -> "John") mustEqual Remove
+      dst.exists must beFalse
+
+      actions.template(dst, src, "name" -> "John") mustEqual Skip
+    }
+
+    "prependToFile" in {
+      val content = "line1\nline2\n"
+      val file = createTestFile("prepend" + content)
+      actions.prependToFile(file, "prepend") mustEqual Subtract
+      there was one(actions.logger).log(Subtract, file)
+      IO.read(file) mustEqual content
+
+      actions.prependToFile(file, "prepend") mustEqual Skip
+      there was one(actions.logger).log(Skip, file)
+    }
+
+    "appendToFile" in {
+      val content = "line1\nline2\n"
+      val file = createTestFile(content + "append")
+      actions.appendToFile(file, "append") mustEqual Subtract
+      there was one(actions.logger).log(Subtract, file)
+      IO.read(file) mustEqual content
+
+      actions.appendToFile(file, "append") mustEqual Skip
+      there was one(actions.logger).log(Skip, file)
+    }
+
+    "insertIntoFileBefore" in {
+      val content = "line1\nline2\n"
+      val file = createTestFile("line1\ninsert\nline2\n")
+      actions.insertIntoFileBefore(file, "line2", "insert\n") mustEqual Subtract
+      there was one(actions.logger).log(Subtract, file)
+      IO.read(file) mustEqual "line1\nline2\n"
+
+      actions.insertIntoFileBefore(file, "line2", "insert\n") mustEqual Skip
+      there was one(actions.logger).log(Skip, file)
+    }
+
+    "insertIntoFileAfter" in {
+      val content = "line1\nline2\n"
+      val file = createTestFile("line1\ninsert\nline2\n")
+      actions.insertIntoFileAfter(file, "line1\n", "insert\n") mustEqual Subtract
+      there was one(actions.logger).log(Subtract, file)
+      IO.read(file) mustEqual "line1\nline2\n"
+
+      actions.insertIntoFileAfter(file, "line1\n", "insert\n") mustEqual Skip
+      there was one(actions.logger).log(Skip, file)
+      IO.read(file) mustEqual "line1\nline2\n"
+    }
+
+    "recordInvocations" in {
+      val dir = workDir / "test"
+      val file = dir / "file"
+      IO.write(file, "test")
+      val functions = actions.recordInvocations {
+        actions.createDirectory(dir)
+        actions.createFile(file, "test")
+      }
+      functions.size mustEqual 2
+      file.exists must beTrue
+      functions.reverse.foreach(_.apply)
+      file.exists must beFalse
     }
   }
 }

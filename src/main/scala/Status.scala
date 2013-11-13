@@ -11,6 +11,8 @@ sealed abstract class Status(val color:String) {
 
 object Status {
   case object Invoke extends Status(BOLD)
+  case object Revoke extends Status(BOLD)
+  case object Record extends Status(BOLD)
   case object Create extends Status(GREEN)
   case object Prepend extends Status(GREEN)
   case object Append extends Status(GREEN)

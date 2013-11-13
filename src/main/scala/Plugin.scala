@@ -7,6 +7,7 @@ import Keys._
 object Plugin extends sbt.Plugin {
   val generatorSettings = Seq(
     generate <<= Task.generate,
+    destroy <<= Task.destroy,
     copyTemplates <<= Task.copyTemplates,
     templateDirectory := baseDirectory.value / "templates"
   )
@@ -18,10 +19,20 @@ object Plugin extends sbt.Plugin {
       actions.copyResources("templates", dir)
     }
 
-    def generate = Def.inputTask { Generator.parser.parsed match {
-      case (name: String, args) =>
-        val context = new GeneratorContext(state.value, streams.value.log)
-        Generator(name).asInstanceOf[Generator[Any]].invoke(args)(context)
-    }}
+    def generate = Def.inputTask {
+      Generator.parser.parsed match {
+        case (name: String, args) =>
+          val context = new GeneratorContext(state.value, streams.value.log)
+          Generator(name).asInstanceOf[Generator[Any]].invoke(args)(context)
+      }
+    }
+
+    def destroy = Def.inputTask {
+      Generator.parser.parsed match {
+        case (name: String, args) =>
+          val context = new GeneratorContext(state.value, streams.value.log)
+          Generator(name).asInstanceOf[Generator[Any]].revoke(args)(context)
+      }
+    }
   }
 }
