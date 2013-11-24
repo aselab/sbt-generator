@@ -59,6 +59,16 @@ trait Generator[ArgumentsType] extends RevokableActions {
   implicit protected def context = _context.value
 }
 
+abstract class DefaultGenerator(val name: String) extends Generator[Seq[String]] {
+  def help = "[args]*"
+  def argumentsParser: Parser[Seq[String]] = spaceDelimited("args*")
+}
+
+abstract class NoArgGenerator(val name: String) extends Generator[Unit] {
+  def help = ""
+  def argumentsParser: Parser[Unit] = EOF
+}
+
 object Generator {
   private val generators = collection.mutable.Map[String, Generator[_]]()
   private val parsers = collection.mutable.MutableList[Parser[_]]()
@@ -70,7 +80,7 @@ object Generator {
   def register(generator: Generator[_]) {
     import generator._
     generators += (name -> generator)
-    val parser = Space ~> (token(name <~ Space) ~ argumentsParser)
+    val parser = Space ~> (token(name) ~ argumentsParser)
     parsers += parser !!! "Usage: generate %s %s".format(name, help)
   }
 }
