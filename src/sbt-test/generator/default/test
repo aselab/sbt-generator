@@ -1,0 +1,10 @@
+-> generate sample1 arg
+> generate sample1
+$ exists sample1/file
+> destroy sample1
+$ absent sample1/file
+
+> generate sample2 arg
+$ exists sample2/file
+> destroy sample2
+$ absent sample2/file

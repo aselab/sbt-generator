@@ -22,4 +22,6 @@ ScriptedPlugin.scriptedSettings
 
 ScriptedPlugin.scriptedBufferLog := false
 
+ScriptedPlugin.scriptedLaunchOpts += "-Dversion=" + version.value
+
 watchSources ++= ScriptedPlugin.sbtTestDirectory.value.***.get

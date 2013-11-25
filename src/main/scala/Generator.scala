@@ -67,6 +67,17 @@ abstract class DefaultGenerator(val name: String) extends Generator[Seq[String]]
 abstract class NoArgGenerator(val name: String) extends Generator[Unit] {
   def help = ""
   def argumentsParser: Parser[Unit] = EOF
+
+  protected def generate: Unit
+  protected def destroy: Unit = super.destroy()
+  protected def generate(args: Unit): Unit = generate
+  override protected def destroy(args: Unit): Unit = destroy
+
+  def invoke(implicit context: GeneratorContext) = super.invoke()
+  override def invoke(args: Unit)(implicit context: GeneratorContext) = invoke
+
+  def revoke(implicit context: GeneratorContext) = super.revoke()
+  override def revoke(args: Unit)(implicit context: GeneratorContext) = revoke
 }
 
 object Generator {
