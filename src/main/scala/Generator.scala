@@ -73,7 +73,11 @@ object Generator {
   private val generators = collection.mutable.Map[String, Generator[_]]()
   private val parsers = collection.mutable.MutableList[Parser[_]]()
 
-  lazy val parser = parsers.reduceLeft {(a, b) => a | b}
+  def parser = if (parsers.size > 0) {
+    parsers.reduceLeft {(a, b) => a | b}
+  } else {
+    failure("No generator is registered")
+  }
 
   def apply(name: String): Generator[_] = generators(name)
 
