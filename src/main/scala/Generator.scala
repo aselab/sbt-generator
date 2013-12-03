@@ -11,14 +11,14 @@ object Mode extends Enumeration {
   val Invoke, Revoke = Value
 }
 
-class GeneratorContext(
-  state: State, streamLogger: Logger
+case class GeneratorContext(
+  state: State, streamLogger: Logger, indentLevel: Int = 0
 ) {
-  val extracted: Extracted = Project.extract(state)
+  lazy val extracted: Extracted = Project.extract(state)
   def apply[T](key: SettingKey[T]): T = extracted.get(key)
   def apply[T](key: TaskKey[T]): T = extracted.runTask(key, state)._2
 
-  val logger = new GeneratorLogger(streamLogger)
+  lazy val logger = new GeneratorLogger(streamLogger, "  " * indentLevel)
   lazy val scalaJar: File = apply(scalaInstance).libraryJar
   lazy val templateDir: File = apply(templateDirectory)
   lazy val sourceDir: File = apply(scalaSource in Compile)
@@ -38,17 +38,21 @@ trait Generator[ArgumentsType] extends RevokableActions {
     functions.reverse.foreach(_.apply)
   }
 
-  def invoke(args: ArgumentsType)(implicit context: GeneratorContext) =
-    _context.withValue(context) {
+  def invoke(args: ArgumentsType)(implicit context: GeneratorContext) = {
+    context.logger.log(Status.Invoke, name)
+    _context.withValue(context.copy(indentLevel = context.indentLevel + 1)) {
       _mode = Mode.Invoke
       generate(args.asInstanceOf[ArgumentsType])
     }
+  }
 
-  def revoke(args: ArgumentsType)(implicit context: GeneratorContext) =
-    _context.withValue(context) {
+  def revoke(args: ArgumentsType)(implicit context: GeneratorContext) = {
+    context.logger.log(Status.Revoke, name)
+    _context.withValue(context.copy(indentLevel = context.indentLevel + 1)) {
       _mode = Mode.Revoke
       destroy(args.asInstanceOf[ArgumentsType])
     }
+  }
 
   def register = Generator.register(this)
 

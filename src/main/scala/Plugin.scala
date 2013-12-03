@@ -28,7 +28,7 @@ object Plugin extends sbt.Plugin {
     def generate = Def.inputTask {
       parser.parsed match {
         case (name: String, args) =>
-          val context = new GeneratorContext(state.value, streams.value.log)
+          val context = GeneratorContext(state.value, streams.value.log)
           Generator(name).asInstanceOf[Generator[Any]].invoke(args)(context)
       }
     }
@@ -36,7 +36,7 @@ object Plugin extends sbt.Plugin {
     def destroy = Def.inputTask {
       parser.parsed match {
         case (name: String, args) =>
-          val context = new GeneratorContext(state.value, streams.value.log)
+          val context = GeneratorContext(state.value, streams.value.log)
           Generator(name).asInstanceOf[Generator[Any]].revoke(args)(context)
       }
     }
