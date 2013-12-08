@@ -1,9 +1,11 @@
 package com.github.aselab.sbt
 
 import sbt._
-import collection.JavaConversions.enumerationAsScalaIterator
+import difflib._
+import collection.JavaConverters._
 import scala.util.matching.Regex
 import java.util.regex.Pattern
+import scala.Console._
 
 trait FileActions {
   def logger: GeneratorLogger
@@ -125,18 +127,49 @@ trait FileActions {
   }
 
   def resolveConflict(file: File, data: String): Status = {
-    val question = "The file %s exists, do you want to overwrite it? (y/n): ".format(file.getPath)
+    val question = """  Overwrite %s? (enter "h" for help) [Yndh] """.format(file.getPath)
+
+    val help = """
+    |  Y    yes     overwrite
+    |  n    no      do not overwrite
+    |  d    diff    show the differences between the old and the new
+    |  h    help    show this help
+    |""".stripMargin
+
+    println(help)
+
     def ask: Status = {
-      scala.Console.readLine(question).toLowerCase.headOption match {
+      readLine(question).toLowerCase.headOption match {
         case Some('y') =>
           IO.write(file, data)
           log(Status.Force, file)
         case Some('n') =>
           log(Status.Skip, file)
+        case Some('d') =>
+          println(diff(file, data, logger.ansiCodesSupported))
+          ask
+        case Some('h') =>
+          println(help)
+          ask
         case _ => ask
       }
     }
     ask
+  }
+
+  def diff(file: File, data: String, colored: Boolean): String = {
+    def colorLine(line: String) = line.headOption match {
+      case Some('+') if colored => GREEN + line + RESET
+      case Some('-') if colored => RED + line + RESET
+      case _ => line
+    }
+
+    val oldLines = IO.read(file).split("\n").toList.asJava
+    val newLines = data.split("\n").toList.asJava
+
+    val patch = DiffUtils.diff(oldLines, newLines)
+    DiffUtils.generateUnifiedDiff(file.getPath, "new", oldLines, patch, 3)
+      .asScala.map(colorLine).mkString("\n")
   }
 
   def log(status: Status, file: File): Status = {
@@ -161,7 +194,7 @@ class TaskActions(loader: ClassLoader, _logger: Logger) extends FileActions {
 
   def copyResources(name: String, dir: File): Unit = {
     val created = collection.mutable.Map[File, Boolean]()
-    loader.getResources(name).foreach(url =>
+    loader.getResources(name).asScala.foreach(url =>
       url.getProtocol match {
         case "file" =>
           copyDirectory(file(url.getPath), dir).foreach {f => created(f) = true}
@@ -169,7 +202,7 @@ class TaskActions(loader: ClassLoader, _logger: Logger) extends FileActions {
           val con = url.openConnection.asInstanceOf[java.net.JarURLConnection]
           val entryName = con.getEntryName
           val jarFile = con.getJarFile
-          jarFile.entries.filter(_.getName.startsWith(entryName)).foreach { e =>
+          jarFile.entries.asScala.filter(_.getName.startsWith(entryName)).foreach { e =>
             val dst = dir / e.getName.drop(entryName.size)
             created.getOrElseUpdate(dst, {
               if (e.isDirectory) {

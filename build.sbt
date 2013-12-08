@@ -12,6 +12,7 @@ resolvers += Resolver.sonatypeRepo("snapshots")
 
 libraryDependencies ++= Seq(
   "org.fusesource.scalate" %% "scalate-core" % "1.6.1",
+  "com.googlecode.java-diff-utils" % "diffutils" % "1.3.0",
   "org.specs2" %% "specs2" % "2.2.2" % "test",
   "org.mockito" % "mockito-all" % "1.9.5" % "test"
 )
