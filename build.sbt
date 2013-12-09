@@ -26,3 +26,37 @@ ScriptedPlugin.scriptedBufferLog := false
 ScriptedPlugin.scriptedLaunchOpts += "-Dversion=" + version.value
 
 watchSources ++= ScriptedPlugin.sbtTestDirectory.value.***.get
+
+publishTo := {
+  val nexus = "https://oss.sonatype.org/"
+  if (version.value.trim.endsWith("SNAPSHOT"))
+    Some("snapshots" at nexus + "content/repositories/snapshots")
+  else
+    Some("releases"  at nexus + "service/local/staging/deploy/maven2")
+}
+
+pomExtra :=
+  <url>https://github.com/aselab/sbt-generator</url>
+  <licenses>
+    <license>
+      <name>MIT License</name>
+      <url>http://www.opensource.org/licenses/mit-license.php</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+  <scm>
+    <url>https://github.com/aselab/sbt-generator.git</url>
+    <connection>scm:git:https://github.com/aselab/sbt-generator.git</connection>
+  </scm>
+  <developers>
+    <developer>
+      <id>a-ono</id>
+      <name>Akihiro Ono</name>
+      <url>https://github.com/a-ono</url>
+    </developer>
+    <developer>
+      <id>y-yoshinoya</id>
+      <name>Yuki Yoshinoya</name>
+      <url>https://github.com/y-yoshinoya</url>
+    </developer>
+  </developers>
