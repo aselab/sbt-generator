@@ -5,6 +5,7 @@ import org.specs2.mutable._
 import org.specs2.mock._
 import org.specs2.specification._
 import Status._
+import scala.Console._
 
 object ActionsSpec extends Specification with BeforeAfterExample with Mockito {
   sequential
@@ -239,6 +240,33 @@ object ActionsSpec extends Specification with BeforeAfterExample with Mockito {
       val file = createTestFile(content)
       actions.insertIntoObject(file, "Sample", insert) mustEqual Insert
       IO.read(file) mustEqual expect
+    }
+
+    "diff" in {
+      val content = """
+      |aaa
+      |bbb
+      |ccc
+      |""".stripMargin
+
+      val newContent = """
+      |aaa
+      |ccc
+      |ddd
+      |""".stripMargin
+
+      val diff = """
+      | aaa
+      |-bbb
+      | ccc
+      |+ddd""".stripMargin
+
+      val file = createTestFile(content)
+      actions.diff(file, newContent, false) must contain(diff)
+
+      val coloredDiff = actions.diff(file, newContent, true)
+      coloredDiff must contain(RED + "-bbb" + RESET)
+      coloredDiff must contain(GREEN + "+ddd" + RESET)
     }
   }
 
