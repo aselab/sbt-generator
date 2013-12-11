@@ -3,7 +3,7 @@ package com.github.aselab.sbt
 import sbt._
 import org.specs2.mutable._
 import org.specs2.mock._
-import org.specs2.specification._
+import org.specs2.specification.BeforeAfterExample
 import Status._
 import scala.Console._
 
@@ -13,6 +13,21 @@ object ActionsSpec extends Specification with BeforeAfterExample with Mockito {
   class Tester(var mode: Mode.Value = Mode.Invoke) extends RevokableActions {
     val logger = mock[GeneratorLogger]
     val scalateTemplate = mock[ScalateTemplate]
+  }
+
+  class MockIO(input: String) extends BeforeAfter {
+    lazy val mockIn = new java.io.ByteArrayInputStream(input.getBytes)
+    lazy val mockOut = new java.io.ByteArrayOutputStream()
+
+    def before = {
+      setIn(mockIn)
+      setOut(mockOut)
+    }
+
+    def after = {
+      setIn(in)
+      setOut(out)
+    }
   }
 
   var workDir: File = _
@@ -82,6 +97,15 @@ object ActionsSpec extends Specification with BeforeAfterExample with Mockito {
       actions.createFile(file, content) mustEqual Identical
       there was one(actions.logger).log(Identical, file)
       IO.read(file) mustEqual content
+    }
+
+    "createFile with conflict" in new MockIO("y") {
+      val oldContent = "line1\nline2\nline3"
+      val newContent = "changed"
+      val file = createTestFile(oldContent)
+      
+      actions.createFile(file, newContent) mustEqual Force
+      IO.read(file) mustEqual newContent
     }
 
     "removeFile" in {
@@ -267,6 +291,41 @@ object ActionsSpec extends Specification with BeforeAfterExample with Mockito {
       val coloredDiff = actions.diff(file, newContent, true)
       coloredDiff must contain(RED + "-bbb" + RESET)
       coloredDiff must contain(GREEN + "+ddd" + RESET)
+    }
+
+    "resolveConflict" in {
+      val oldContent = """
+      |aaa
+      |bbb
+      |ccc
+      |""".stripMargin
+
+      val newContent = """
+      |aaa
+      |ccc
+      |ddd
+      |""".stripMargin
+
+      "answers yes" in new MockIO("y") {
+        val file = createTestFile(oldContent)
+        actions.resolveConflict(file, newContent) mustEqual Force
+        there was one(actions.logger).log(Force, file)
+        IO.read(file) mustEqual newContent
+      }
+
+      "answers no" in new MockIO("n") {
+        val file = createTestFile(oldContent)
+        actions.resolveConflict(file, newContent) mustEqual Skip
+        there was one(actions.logger).log(Skip, file)
+        IO.read(file) mustEqual oldContent
+      }
+
+      "answers help, diff, yes" in new MockIO("h\nd\ny") {
+        val file = createTestFile(oldContent)
+        actions.resolveConflict(file, newContent) mustEqual Force
+        mockOut.toString must contain("show this help")
+        mockOut.toString must contain("--- " + file.getPath)
+      }
     }
   }
 

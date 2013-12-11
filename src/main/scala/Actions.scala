@@ -169,7 +169,7 @@ trait FileActions {
 
     val patch = DiffUtils.diff(oldLines, newLines)
     DiffUtils.generateUnifiedDiff(file.getPath, "new", oldLines, patch, 3)
-      .asScala.map(colorLine).mkString("\n")
+      .asScala.map(colorLine).mkString("\n", "\n", "\n")
   }
 
   def log(status: Status, file: File): Status = {
