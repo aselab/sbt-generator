@@ -154,45 +154,45 @@ trait FileActions {
   trait ConflictResolver {
     def name: String
     def help: String
+    def weight: Int
     def resolve(file: File, data: String): Status
     def command: Char = name.head
   }
 
   object ConflictResolver {
-    private val resolvers = collection.mutable.MutableList[ConflictResolver]()
+    private val _resolvers = collection.mutable.MutableList[ConflictResolver]()
+    def resolvers = _resolvers.sortBy(_.weight).toList
 
-    def apply(_name: String, _help: String)(f: (File, String) => Status) = {
+    def apply(_name: String, _help: String, _weight: Int)(f: (File, String) => Status) = {
       new ConflictResolver {
         val name = _name
-        val help: String = _help
+        val help = _help
+        val weight = _weight
         def resolve(file: File, data: String) = f(file, data)
       }
     }
 
     def add(resolver: ConflictResolver): Unit =
-      resolvers += resolver
+      _resolvers += resolver
 
-    def add(name: String, help: String)(f: (File, String) => Status): Unit =
-      add(apply(name, help)(f))
+    def add(name: String, help: String, weight: Int = 1)(f: (File, String) => Status): Unit =
+      add(apply(name, help, weight)(f))
 
     def printHelp = {
       val lines = resolvers.map(r =>
         "%3s    %-8s%s".format(r.command, r.name, r.help)
-      ) :+ "  h    help    show this help"
+      )
       println(lines.mkString("\n", "\n", "\n"))
     }
 
     def ask(file: File, data: String): Status = {
       val question = """  Overwrite %s? (enter "h" for help) [%s] """.format(
-        file.getPath, resolvers.map(_.command).mkString + "h"
+        file.getPath, resolvers.map(_.command).mkString
       )
 
       readLine(question).toLowerCase.headOption match {
-        case Some('h') =>
-          printHelp
-          ask(file, data)
         case Some(c) =>
-          resolvers.find(_.command == c)
+          _resolvers.find(_.command == c)
             .map(_.resolve _).getOrElse(ask _).apply(file, data)
         case None =>
           ask(file, data)
@@ -210,8 +210,13 @@ trait FileActions {
       log(Status.Skip, file)
     }
 
-    add("diff", "show the differences between the old and the new") { (file, data) =>
+    add("diff", "show the differences between the old and the new", 10) { (file, data) =>
       println(diff(file, data, logger.ansiCodesSupported))
+      ask(file, data)
+    }
+
+    add("help", "show this help", 100) { (file, data) =>
+      printHelp
       ask(file, data)
     }
   }
