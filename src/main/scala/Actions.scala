@@ -127,34 +127,8 @@ trait FileActions {
   }
 
   def resolveConflict(file: File, data: String): Status = {
-    val question = """  Overwrite %s? (enter "h" for help) [Yndh] """.format(file.getPath)
-
-    val help = """
-    |  Y    yes     overwrite
-    |  n    no      do not overwrite
-    |  d    diff    show the differences between the old and the new
-    |  h    help    show this help
-    |""".stripMargin
-
-    println(help)
-
-    def ask: Status = {
-      readLine(question).toLowerCase.headOption match {
-        case Some('y') =>
-          IO.write(file, data)
-          log(Status.Force, file)
-        case Some('n') =>
-          log(Status.Skip, file)
-        case Some('d') =>
-          println(diff(file, data, logger.ansiCodesSupported))
-          ask
-        case Some('h') =>
-          println(help)
-          ask
-        case _ => ask
-      }
-    }
-    ask
+    ConflictResolver.printHelp
+    ConflictResolver.ask(file, data)
   }
 
   def diff(file: File, data: String, colored: Boolean): String = {
@@ -175,6 +149,71 @@ trait FileActions {
   def log(status: Status, file: File): Status = {
     logger.log(status, file)
     status
+  }
+
+  trait ConflictResolver {
+    def name: String
+    def help: String
+    def resolve(file: File, data: String): Status
+    def command: Char = name.head
+  }
+
+  object ConflictResolver {
+    private val resolvers = collection.mutable.MutableList[ConflictResolver]()
+
+    def apply(_name: String, _help: String)(f: (File, String) => Status) = {
+      new ConflictResolver {
+        val name = _name
+        val help: String = _help
+        def resolve(file: File, data: String) = f(file, data)
+      }
+    }
+
+    def add(resolver: ConflictResolver): Unit =
+      resolvers += resolver
+
+    def add(name: String, help: String)(f: (File, String) => Status): Unit =
+      add(apply(name, help)(f))
+
+    def printHelp = {
+      val lines = resolvers.map(r =>
+        "%3s    %-8s%s".format(r.command, r.name, r.help)
+      ) :+ "  h    help    show this help"
+      println(lines.mkString("\n", "\n", "\n"))
+    }
+
+    def ask(file: File, data: String): Status = {
+      val question = """  Overwrite %s? (enter "h" for help) [%s] """.format(
+        file.getPath, resolvers.map(_.command).mkString + "h"
+      )
+
+      readLine(question).toLowerCase.headOption match {
+        case Some('h') =>
+          printHelp
+          ask(file, data)
+        case Some(c) =>
+          resolvers.find(_.command == c)
+            .map(_.resolve _).getOrElse(ask _).apply(file, data)
+        case None =>
+          ask(file, data)
+      }
+    }
+
+    // Add default resolvers
+
+    add("yes", "overwrite") { (file, data) =>
+      IO.write(file, data)
+      log(Status.Force, file)
+    }
+
+    add("no", "do not overwrite") { (file, data) =>
+      log(Status.Skip, file)
+    }
+
+    add("diff", "show the differences between the old and the new") { (file, data) =>
+      println(diff(file, data, logger.ansiCodesSupported))
+      ask(file, data)
+    }
   }
 }
 
