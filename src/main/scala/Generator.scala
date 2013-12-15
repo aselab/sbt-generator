@@ -42,7 +42,12 @@ trait Generator[ArgumentsType] extends RevokableActions {
     context.logger.log(Status.Invoke, name)
     _context.withValue(context.copy(indentLevel = context.indentLevel + 1)) {
       _mode = Mode.Invoke
-      generate(args.asInstanceOf[ArgumentsType])
+      try {
+        overwriteAll = false
+        generate(args.asInstanceOf[ArgumentsType])
+      } catch {
+        case Status.Abort => logger.log(Status.Abort)
+      }
     }
   }
 
@@ -50,7 +55,12 @@ trait Generator[ArgumentsType] extends RevokableActions {
     context.logger.log(Status.Revoke, name)
     _context.withValue(context.copy(indentLevel = context.indentLevel + 1)) {
       _mode = Mode.Revoke
-      destroy(args.asInstanceOf[ArgumentsType])
+      try {
+        overwriteAll = false
+        destroy(args.asInstanceOf[ArgumentsType])
+      } catch {
+        case Status.Abort => logger.log(Status.Abort)
+      }
     }
   }
 
@@ -61,6 +71,22 @@ trait Generator[ArgumentsType] extends RevokableActions {
   def logger = context.logger
   def sourceDir = context.sourceDir
   implicit protected def context = _context.value
+
+  private var overwriteAll = false
+  override def resolveConflict(file: File, data: String) = if (overwriteAll) {
+    ConflictResolver.yes.resolve(file, data)
+  } else {
+    super.resolveConflict(file, data)
+  }
+
+  ConflictResolver.add("all", "overwrite this and all others") { (file, data) =>
+    overwriteAll = true
+    ConflictResolver.yes.resolve(file, data)
+  }
+
+  ConflictResolver.add("quit", "abort") { (file, data) =>
+    throw Status.Abort
+  }
 }
 
 abstract class DefaultGenerator(val name: String) extends Generator[Seq[String]] {

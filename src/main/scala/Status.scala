@@ -2,9 +2,9 @@ package com.github.aselab.sbt
 
 import scala.Console._
 
-sealed abstract class Status(val color:String) {
+sealed abstract class Status(val color:String) extends Throwable with Product {
   def format(colored: Boolean): String = {
-    val s = "%10s".format(toString.toLowerCase)
+    val s = "%10s".format(productPrefix.toLowerCase)
     if (colored) color + s + RESET else s
   }
 }
@@ -24,4 +24,5 @@ object Status {
   case object Conflict extends Status(RED)
   case object Remove extends Status(RED)
   case object Subtract extends Status(RED)
+  case object Abort extends Status(RED)
 }

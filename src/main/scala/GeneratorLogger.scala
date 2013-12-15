@@ -10,6 +10,9 @@ class GeneratorLogger(underlying: Logger, indent: String = "") extends Logger {
 
   override def ansiCodesSupported: Boolean = underlying.ansiCodesSupported
 
+  def log(status: Status): Unit =
+    info(status.format(ansiCodesSupported))
+
   def log(status: Status, message: => String): Unit =
     info(status.format(ansiCodesSupported) + "  " + indent + message)
 

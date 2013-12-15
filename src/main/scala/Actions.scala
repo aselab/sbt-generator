@@ -49,13 +49,16 @@ trait FileActions {
       if (IO.read(file) == d) Status.Identical else Status.Conflict
     } else {
       val dir = file.getParentFile
-      if (!dir.isDirectory) createDirectory(dir)
+      if (dir != null && !dir.isDirectory) createDirectory(dir)
       IO.write(file, d)
       Status.Create
     }
-    log(status, file)
 
-    if (status == Status.Conflict) resolveConflict(file, d) else status
+    if (status == Status.Conflict) {
+      resolveConflict(file, d)
+    } else {
+      log(status, file)
+    }
   }
 
   def removeFile(file: File): Status = {
@@ -127,6 +130,7 @@ trait FileActions {
   }
 
   def resolveConflict(file: File, data: String): Status = {
+    log(Status.Conflict, file)
     ConflictResolver.printHelp
     ConflictResolver.ask(file, data)
   }
@@ -163,7 +167,7 @@ trait FileActions {
     private val _resolvers = collection.mutable.MutableList[ConflictResolver]()
     def resolvers = _resolvers.sortBy(_.weight).toList
 
-    def apply(_name: String, _help: String, _weight: Int)(f: (File, String) => Status) = {
+    def apply(_name: String, _help: String, _weight: Int = 1)(f: (File, String) => Status) = {
       new ConflictResolver {
         val name = _name
         val help = _help
@@ -201,10 +205,11 @@ trait FileActions {
 
     // Add default resolvers
 
-    add("yes", "overwrite") { (file, data) =>
+    val yes = apply("yes", "overwrite") { (file, data) =>
       IO.write(file, data)
       log(Status.Force, file)
     }
+    add(yes)
 
     add("no", "do not overwrite") { (file, data) =>
       log(Status.Skip, file)
