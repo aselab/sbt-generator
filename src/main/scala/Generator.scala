@@ -110,7 +110,7 @@ abstract class NoArgGenerator(val name: String) extends Generator[Unit] {
   override def revoke(args: Unit)(implicit context: GeneratorContext) = revoke
 }
 
-object Generator {
+trait GeneratorCompanion {
   private val generators = collection.mutable.Map[String, Generator[_]]()
   private val parsers = collection.mutable.MutableList[Parser[_]]()
 
@@ -120,12 +120,19 @@ object Generator {
     failure("No generator is registered")
   }
 
-  def apply(name: String): Generator[_] = generators(name)
+  def apply(name: String): Generator[_] = generators.get(name).getOrElse(
+    sys.error(name + " generator is not registered")
+  )
 
-  def register(generator: Generator[_]) {
+  def register(generator: Generator[_]): Generator[_] = {
     import generator._
+    if (generators.get(name).exists(_ != generator)) {
+      sys.error(name + " generator is already registered")
+    }
     generators += (name -> generator)
     val parser = Space ~> (token(name) ~ argumentsParser)
     parsers += parser !!! "Usage: generate %s %s".format(name, help)
+    generator
   }
 }
+object Generator extends GeneratorCompanion
