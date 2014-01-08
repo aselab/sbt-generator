@@ -74,7 +74,6 @@ object ActionsSpec extends Specification with BeforeAfterExample with Mockito {
       actions.copyDirectory(copyDir, workDir) must contain(
         workDir / "dir1",
         workDir / "dir1/dir2",
-        workDir / "dir1/dir2/dir3",
         workDir / "dir1/dir2/file1",
         workDir / "dir1/file2",
         workDir / "dir4",
@@ -360,7 +359,6 @@ object ActionsSpec extends Specification with BeforeAfterExample with Mockito {
       val files = Seq(
         workDir / "dir1",
         workDir / "dir1/dir2",
-        workDir / "dir1/dir2/dir3",
         workDir / "dir1/dir2/file1",
         workDir / "dir1/file2",
         workDir / "dir4",
