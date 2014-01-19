@@ -64,8 +64,6 @@ trait Generator[ArgumentsType] extends RevokableActions {
     }
   }
 
-  def register = Generator.register(this)
-
   private val _context = new DynamicVariable[GeneratorContext](null)
   def scalateTemplate = context.scalateTemplate
   def logger = context.logger
@@ -110,29 +108,3 @@ abstract class NoArgGenerator(val name: String) extends Generator[Unit] {
   override def revoke(args: Unit)(implicit context: GeneratorContext) = revoke
 }
 
-trait GeneratorCompanion {
-  private val generators = collection.mutable.Map[String, Generator[_]]()
-  private val parsers = collection.mutable.MutableList[Parser[_]]()
-
-  def parser = if (parsers.size > 0) {
-    parsers.reduceLeft {(a, b) => a | b}
-  } else {
-    failure("No generator is registered")
-  }
-
-  def apply(name: String): Generator[_] = generators.get(name).getOrElse(
-    sys.error(name + " generator is not registered")
-  )
-
-  def register(generator: Generator[_]): Generator[_] = {
-    import generator._
-    if (generators.get(name).exists(_ != generator)) {
-      sys.error(name + " generator is already registered")
-    }
-    generators += (name -> generator)
-    val parser = Space ~> (token(name) ~ argumentsParser)
-    parsers += parser !!! "Usage: generate %s %s".format(name, help)
-    generator
-  }
-}
-object Generator extends GeneratorCompanion

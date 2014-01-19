@@ -3,6 +3,7 @@ package com.github.aselab.sbt
 import sbt._
 import sbt.Keys._
 import Keys._
+import sbt.complete.DefaultParsers._
 
 object Plugin extends sbt.Plugin {
   val GeneratorKeys = Keys
@@ -17,9 +18,15 @@ object Plugin extends sbt.Plugin {
 }
 
 object GeneratorTasks {
-  lazy val parser = Def.setting {
-    generators.value.foreach(_.register)
-    Generator.parser
+  def parser = Def.setting {
+    if (generators.value.size > 0) {
+      generators.value.asInstanceOf[Seq[Generator[Any]]].map { g =>
+        val parser = Space ~> (token(g.name) ~ g.argumentsParser)
+        parser !!! "Usage: generate %s %s".format(g.name, g.help)
+      }.reduceLeft {(a, b) => a | b}
+    } else {
+      failure("No generator is registered")
+    }
   }
 
   def copyTemplates = Def.task {
@@ -32,7 +39,10 @@ object GeneratorTasks {
     parser.parsed match {
       case (name: String, args) =>
         val context = GeneratorContext(state.value, streams.value.log)
-        Generator(name).asInstanceOf[Generator[Any]].invoke(args)(context)
+        val generator = generators.value.find(_.name == name).getOrElse(
+          sys.error(name + " generator is not found")
+        )
+        generator.asInstanceOf[Generator[Any]].invoke(args)(context)
     }
   }
 
@@ -40,7 +50,10 @@ object GeneratorTasks {
     parser.parsed match {
       case (name: String, args) =>
         val context = GeneratorContext(state.value, streams.value.log)
-        Generator(name).asInstanceOf[Generator[Any]].revoke(args)(context)
+        val generator = generators.value.find(_.name == name).getOrElse(
+          sys.error(name + " generator is not found")
+        )
+        generator.asInstanceOf[Generator[Any]].revoke(args)(context)
     }
   }
 }
