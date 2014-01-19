@@ -5,40 +5,42 @@ import sbt.Keys._
 import Keys._
 
 object Plugin extends sbt.Plugin {
+  val GeneratorKeys = Keys
+
   val generatorSettings = Seq(
     generators := Nil,
-    generate <<= Task.generate,
-    destroy <<= Task.destroy,
-    copyTemplates <<= Task.copyTemplates,
+    generate <<= GeneratorTasks.generate,
+    destroy <<= GeneratorTasks.destroy,
+    copyTemplates <<= GeneratorTasks.copyTemplates,
     templateDirectory := baseDirectory.value / "templates"
   )
+}
 
-  object Task {
-    lazy val parser = Def.setting {
-      generators.value.foreach(_.register)
-      Generator.parser
+object GeneratorTasks {
+  lazy val parser = Def.setting {
+    generators.value.foreach(_.register)
+    Generator.parser
+  }
+
+  def copyTemplates = Def.task {
+    val dir = templateDirectory.value
+    val actions = new TaskActions(getClass.getClassLoader, streams.value.log)
+    actions.copyResources("templates", dir)
+  }
+
+  def generate = Def.inputTask {
+    parser.parsed match {
+      case (name: String, args) =>
+        val context = GeneratorContext(state.value, streams.value.log)
+        Generator(name).asInstanceOf[Generator[Any]].invoke(args)(context)
     }
+  }
 
-    def copyTemplates = Def.task {
-      val dir = templateDirectory.value
-      val actions = new TaskActions(getClass.getClassLoader, streams.value.log)
-      actions.copyResources("templates", dir)
-    }
-
-    def generate = Def.inputTask {
-      parser.parsed match {
-        case (name: String, args) =>
-          val context = GeneratorContext(state.value, streams.value.log)
-          Generator(name).asInstanceOf[Generator[Any]].invoke(args)(context)
-      }
-    }
-
-    def destroy = Def.inputTask {
-      parser.parsed match {
-        case (name: String, args) =>
-          val context = GeneratorContext(state.value, streams.value.log)
-          Generator(name).asInstanceOf[Generator[Any]].revoke(args)(context)
-      }
+  def destroy = Def.inputTask {
+    parser.parsed match {
+      case (name: String, args) =>
+        val context = GeneratorContext(state.value, streams.value.log)
+        Generator(name).asInstanceOf[Generator[Any]].revoke(args)(context)
     }
   }
 }
