@@ -12,7 +12,8 @@ object Mode extends Enumeration {
 }
 
 case class GeneratorContext(
-  state: State, streamLogger: Logger, indentLevel: Int = 0
+  state: State, streamLogger: Logger, loader: java.net.URLClassLoader,
+  indentLevel: Int = 0
 ) {
   lazy val extracted: Extracted = Project.extract(state)
   def apply[T](key: SettingKey[T]): T = extracted.get(key)
@@ -22,13 +23,19 @@ case class GeneratorContext(
   lazy val scalaJar: File = apply(scalaInstance).libraryJar
   lazy val templateDir: File = apply(templateDirectory)
   lazy val sourceDir: File = apply(scalaSource in Compile)
-  lazy val scalateTemplate = new ScalateTemplate(scalaJar, templateDir)
+  lazy val scalateTemplate = new ScalateTemplate(scalaJar, templateDir, loader)
+
+  streamLogger.debug {
+    loader.getURLs.mkString("template load path:\n\t", "\n\t", "")
+  }
 }
 
 trait Generator[ArgumentsType] extends RevokableActions {
   def name: String
   def help: String
   def argumentsParser: Parser[ArgumentsType]
+
+  lazy val location = getClass.getProtectionDomain.getCodeSource.getLocation
 
   private var _mode: Mode.Value = _
   def mode = _mode

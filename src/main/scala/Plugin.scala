@@ -35,25 +35,32 @@ object GeneratorTasks {
     actions.copyResources("templates", dir)
   }
 
+  def get(generators: Seq[Generator[_]], name: String): Generator[Any] = {
+    generators.find(_.name == name).getOrElse(
+      sys.error(name + " generator is not found")
+    ).asInstanceOf[Generator[Any]]
+  }
+
+  def loader(generators: Seq[Generator[_]]) = {
+    val urls = generators.reverse.map(_.location).distinct.toArray
+    new java.net.URLClassLoader(urls)
+  }
+
   def generate = Def.inputTask {
     parser.parsed match {
       case (name: String, args) =>
-        val context = GeneratorContext(state.value, streams.value.log)
-        val generator = generators.value.find(_.name == name).getOrElse(
-          sys.error(name + " generator is not found")
-        )
-        generator.asInstanceOf[Generator[Any]].invoke(args)(context)
+        val all = generators.value
+        val context = GeneratorContext(state.value, streams.value.log, loader(all))
+        get(all, name).invoke(args)(context)
     }
   }
 
   def destroy = Def.inputTask {
     parser.parsed match {
       case (name: String, args) =>
-        val context = GeneratorContext(state.value, streams.value.log)
-        val generator = generators.value.find(_.name == name).getOrElse(
-          sys.error(name + " generator is not found")
-        )
-        generator.asInstanceOf[Generator[Any]].revoke(args)(context)
+        val all = generators.value
+        val context = GeneratorContext(state.value, streams.value.log, loader(all))
+        get(all,name).revoke(args)(context)
     }
   }
 }

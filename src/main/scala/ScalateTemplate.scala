@@ -3,7 +3,7 @@ package com.github.aselab.sbt
 import sbt._
 import org.fusesource.scalate._
 
-class ScalateTemplate(libraryJar: File, templateDir: File) {
+class ScalateTemplate(libraryJar: File, templateDir: File, loader: ClassLoader){
   lazy val engine = {
     val mode = System.getProperty("scalate.mode", "production")
     val engine = new TemplateEngine(Nil, mode)
@@ -17,7 +17,7 @@ class ScalateTemplate(libraryJar: File, templateDir: File) {
     val source = if (file.exists) {
       TemplateSource.fromFile(file)
     } else {
-      TemplateSource.fromURL(getClass.getResource("/templates/" + templatePath))
+      TemplateSource.fromURL(loader.getResource("templates/" + templatePath))
     }
     engine.layout(source, attributes)
   }
