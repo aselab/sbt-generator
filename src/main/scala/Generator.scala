@@ -25,6 +25,7 @@ case class GeneratorContext(
   lazy val sourceDir: File = apply(scalaSource in Compile)
   lazy val scalateTemplate = new ScalateTemplate(scalaJar, templateDir, loader)
 
+  slf4j.SbtLoggerAdapter.logger = streamLogger
   streamLogger.debug {
     loader.getURLs.mkString("template load path:\n\t", "\n\t", "")
   }
